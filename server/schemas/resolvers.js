@@ -13,7 +13,7 @@ const resolvers = {
 
                 return userData;
             };
-            throw new AuthenticationError('You are not logged in.';)
+            throw new AuthenticationError('You are not logged in.');
         },
     },
 
