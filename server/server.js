@@ -1,35 +1,36 @@
-const express = require('express');
-const { ApolloServer } = require('apollo-server-express');
-const path = require('path');
+const path = require('path')
+const express = require('express')
+const connection = require('./config/connection')
+const { ApolloServer } = require('@apollo/server')
+const { expressMiddleware } = require('@apollo/server/express4')
+const typeDefs = require('./schemas/typeDefs')
+const resolvers = require('./schemas/resolvers')
+const { authMiddleware } = require('./utils/auth')
 
-const { typeDefs, resolvers } = require('./schemas')
-const db = require('./config/connection');
-const { authMiddleware } = require('./utils/auth');
-
-const app = express();
 const PORT = process.env.PORT || 3001;
+const app = express();
 
-const server = new ApolloServer({
-  typeDefs,
-  resolvers,
-  context: authMiddleware,
-});
+const apolloServer = new ApolloServer({ typeDefs, resolvers })
 
-server.applyMiddleware({ app })
+app.use(express.urlencoded({ extended: false }))
+app.use(express.json())
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
-// if we're in production, serve client/build as static assets
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/build')));
+  app.use(express.static(path.join(__dirname, '..', 'client', 'build')))
 }
 
-app.get('*', (req, res) => {
-  res.use(express.static(path.join(__dirname, '../client/build/index.html')));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'))
 })
 
-db.once('open', () => {
-  app.listen(PORT, () => console.log(`🌍 Now listening on localhost:${PORT}`));
-  console.log(`Use GraphQL at http://localhost:${PORT}${server.graphqlPath}`);
-});
+connection.once('open', async () => {
+  await apolloServer.start()
+  app.use('/graphql', expressMiddleware(apolloServer, {
+    context: authMiddleware
+  }))
+
+  app.listen(PORT, () => {
+    console.log(`Express server listening on http://localhost:${PORT}`)
+    console.log(`Apollo GraphQL playground available at http://localhost:${PORT}/graphql`)
+  })
+})
